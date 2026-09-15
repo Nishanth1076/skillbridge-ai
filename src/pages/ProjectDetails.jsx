@@ -13,6 +13,13 @@ import {
 import { db } from "../firebase/firebase";
 import { useAuth } from "../context/AuthContext";
 
+// =========================================
+// LIVE BACKEND URL
+// =========================================
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:5000";
+
 function ProjectDetails() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -232,9 +239,6 @@ function ProjectDetails() {
     setError("");
     setSuccess("");
 
-    // -----------------------------------------
-    // AUTH CHECK
-    // -----------------------------------------
     if (authLoading) {
       setError(
         "Please wait while your login session is being verified."
@@ -249,9 +253,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // ROLE CHECK
-    // -----------------------------------------
     if (profile?.role !== "student") {
       setError(
         "Only student accounts can generate AI proposals."
@@ -259,9 +260,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROJECT CHECK
-    // -----------------------------------------
     if (!project) {
       setError(
         "Project details not found."
@@ -269,9 +267,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROJECT STATUS CHECK
-    // -----------------------------------------
     if (
       project.Status?.toLowerCase() !==
       "open"
@@ -282,9 +277,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // DUPLICATE APPLICATION CHECK
-    // -----------------------------------------
     if (alreadyApplied) {
       setError(
         "You have already applied for this project."
@@ -309,9 +301,6 @@ function ProjectDetails() {
         project.Project_Title
       );
 
-      // -----------------------------------------
-      // STUDENT DATA
-      // -----------------------------------------
       const studentData = {
         name:
           profile?.Name ||
@@ -323,9 +312,6 @@ function ProjectDetails() {
             : profile?.Skills || [],
       };
 
-      // -----------------------------------------
-      // PROJECT DATA
-      // -----------------------------------------
       const projectData = {
         title:
           project.Project_Title ||
@@ -357,11 +343,11 @@ function ProjectDetails() {
         projectData
       );
 
-      // -----------------------------------------
-      // SEND REQUEST TO BACKEND
-      // -----------------------------------------
+      // =========================================
+      // LIVE RENDER BACKEND
+      // =========================================
       const response = await fetch(
-        "http://localhost:5000/api/ai/proposal",
+        `${API_BASE_URL}/api/ai/proposal`,
         {
           method: "POST",
 
@@ -384,9 +370,6 @@ function ProjectDetails() {
         data
       );
 
-      // -----------------------------------------
-      // HANDLE BACKEND ERROR
-      // -----------------------------------------
       if (!response.ok || !data.success) {
         throw new Error(
           data.message ||
@@ -394,9 +377,6 @@ function ProjectDetails() {
         );
       }
 
-      // -----------------------------------------
-      // SET GENERATED PROPOSAL
-      // -----------------------------------------
       setProposal(
         data.proposal || ""
       );
@@ -430,9 +410,6 @@ function ProjectDetails() {
     setError("");
     setSuccess("");
 
-    // -----------------------------------------
-    // AUTH CHECK
-    // -----------------------------------------
     if (authLoading) {
       setError(
         "Please wait while your login session is being verified."
@@ -447,9 +424,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // ROLE CHECK
-    // -----------------------------------------
     if (profile?.role !== "student") {
       setError(
         "Only student accounts can generate AI recommendations."
@@ -457,9 +431,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROJECT CHECK
-    // -----------------------------------------
     if (!project) {
       setError(
         "Project details not found."
@@ -467,9 +438,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROJECT STATUS CHECK
-    // -----------------------------------------
     if (
       project.Status?.toLowerCase() !==
       "open"
@@ -480,9 +448,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // DUPLICATE APPLICATION CHECK
-    // -----------------------------------------
     if (alreadyApplied) {
       setError(
         "You have already applied for this project."
@@ -507,9 +472,6 @@ function ProjectDetails() {
         project.Project_Title
       );
 
-      // -----------------------------------------
-      // STUDENT DATA
-      // -----------------------------------------
       const studentData = {
         skills:
           Array.isArray(profile?.Skills)
@@ -517,9 +479,6 @@ function ProjectDetails() {
             : profile?.Skills || [],
       };
 
-      // -----------------------------------------
-      // PROJECT DATA
-      // -----------------------------------------
       const projectData = {
         title:
           project.Project_Title ||
@@ -547,11 +506,11 @@ function ProjectDetails() {
         projectData
       );
 
-      // -----------------------------------------
-      // SEND REQUEST TO BACKEND
-      // -----------------------------------------
+      // =========================================
+      // LIVE RENDER BACKEND
+      // =========================================
       const response = await fetch(
-        "http://localhost:5000/api/ai/recommendation",
+        `${API_BASE_URL}/api/ai/recommendation`,
         {
           method: "POST",
 
@@ -574,9 +533,6 @@ function ProjectDetails() {
         data
       );
 
-      // -----------------------------------------
-      // HANDLE BACKEND ERROR
-      // -----------------------------------------
       if (!response.ok || !data.success) {
         throw new Error(
           data.message ||
@@ -584,9 +540,6 @@ function ProjectDetails() {
         );
       }
 
-      // -----------------------------------------
-      // SET RECOMMENDATION
-      // -----------------------------------------
       setRecommendation(
         data.recommendation || ""
       );
@@ -622,9 +575,6 @@ function ProjectDetails() {
     setError("");
     setSuccess("");
 
-    // -----------------------------------------
-    // AUTH CHECK
-    // -----------------------------------------
     if (authLoading) {
       setError(
         "Please wait while your login session is being verified."
@@ -639,9 +589,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // ROLE CHECK
-    // -----------------------------------------
     if (profile?.role !== "student") {
       setError(
         "Only student accounts can apply for projects."
@@ -649,9 +596,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROJECT CHECK
-    // -----------------------------------------
     if (!project) {
       setError(
         "Project details not found."
@@ -659,9 +603,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROJECT STATUS CHECK
-    // -----------------------------------------
     if (
       project.Status?.toLowerCase() !==
       "open"
@@ -672,9 +613,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // DUPLICATE APPLICATION CHECK
-    // -----------------------------------------
     if (alreadyApplied) {
       setError(
         "You have already applied for this project."
@@ -682,9 +620,6 @@ function ProjectDetails() {
       return;
     }
 
-    // -----------------------------------------
-    // PROPOSAL VALIDATION
-    // -----------------------------------------
     if (!proposal.trim()) {
       setError(
         "Please enter your proposal."
@@ -716,9 +651,6 @@ function ProjectDetails() {
         project.id
       );
 
-      // -----------------------------------------
-      // FINAL DUPLICATE CHECK
-      // -----------------------------------------
       const applicationsRef = collection(
         db,
         "projects",
@@ -753,9 +685,6 @@ function ProjectDetails() {
         return;
       }
 
-      // -----------------------------------------
-      // APPLICATION DATA
-      // -----------------------------------------
       const applicationData = {
         studentId: user.uid,
 
@@ -780,9 +709,6 @@ function ProjectDetails() {
         applicationData
       );
 
-      // -----------------------------------------
-      // SAVE APPLICATION
-      // -----------------------------------------
       const applicationRef =
         await addDoc(
           applicationsRef,
@@ -870,15 +796,8 @@ function ProjectDetails() {
           "⚠️ AI Request error message:",
           aiError.message
         );
-
-        // Application is already successful.
-        // Do not fail the application because
-        // AI Request logging failed.
       }
 
-      // -----------------------------------------
-      // UPDATE UI
-      // -----------------------------------------
       setAlreadyApplied(true);
 
       setSuccess(
@@ -889,9 +808,6 @@ function ProjectDetails() {
 
       setRecommendation("");
 
-      // -----------------------------------------
-      // REDIRECT
-      // -----------------------------------------
       setTimeout(() => {
         navigate("/my-applications");
       }, 1200);
@@ -1009,9 +925,7 @@ function ProjectDetails() {
     <main className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-5xl">
 
-        {/* =====================================
-            BACK BUTTON
-        ===================================== */}
+        {/* BACK BUTTON */}
         <button
           type="button"
           onClick={() =>
@@ -1022,9 +936,7 @@ function ProjectDetails() {
           ← Back to Projects
         </button>
 
-        {/* =====================================
-            PROJECT DETAILS
-        ===================================== */}
+        {/* PROJECT DETAILS */}
         <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
 
           {/* HEADER */}
@@ -1059,9 +971,7 @@ function ProjectDetails() {
 
           </div>
 
-          {/* =====================================
-              DESCRIPTION
-          ===================================== */}
+          {/* DESCRIPTION */}
           <div className="mt-8">
 
             <h2 className="text-xl font-bold text-gray-900">
@@ -1075,9 +985,7 @@ function ProjectDetails() {
 
           </div>
 
-          {/* =====================================
-              PROJECT INFORMATION
-          ===================================== */}
+          {/* PROJECT INFORMATION */}
           <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-3">
 
             {/* SKILLS */}
@@ -1152,9 +1060,7 @@ function ProjectDetails() {
 
           </div>
 
-          {/* =====================================
-              CLIENT INFORMATION
-          ===================================== */}
+          {/* CLIENT INFORMATION */}
           <div className="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-5">
 
             <p className="text-sm font-medium text-gray-500">
@@ -1170,9 +1076,7 @@ function ProjectDetails() {
 
         </div>
 
-        {/* =====================================
-            APPLICATION FORM
-        ===================================== */}
+        {/* APPLICATION FORM */}
         {profile?.role === "student" ? (
 
           <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -1242,9 +1146,7 @@ function ProjectDetails() {
                 className="mt-6"
               >
 
-                {/* =================================
-                    AI RECOMMENDATION
-                ================================= */}
+                {/* AI RECOMMENDATION */}
                 <div className="mb-8 rounded-xl border border-purple-200 bg-purple-50 p-5">
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1301,9 +1203,7 @@ function ProjectDetails() {
 
                 </div>
 
-                {/* =================================
-                    PROPOSAL LABEL + AI BUTTON
-                ================================= */}
+                {/* PROPOSAL LABEL + AI BUTTON */}
                 <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
                   <label className="block text-sm font-semibold text-gray-700">
@@ -1368,9 +1268,7 @@ function ProjectDetails() {
 
                 </div>
 
-                {/* =================================
-                    FORM BUTTONS
-                ================================= */}
+                {/* FORM BUTTONS */}
                 <div className="mt-6 flex flex-col gap-4 sm:flex-row">
 
                   <button
