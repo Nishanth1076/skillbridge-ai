@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 
 import { auth, db } from "../firebase/firebase";
 
@@ -10,86 +17,131 @@ function GoogleRoleSelection() {
   const [googleUser, setGoogleUser] = useState(null);
   const [selectedRole, setSelectedRole] = useState("");
   const [error, setError] = useState("");
-  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // =====================================================
-  // CHECK GOOGLE USER
+  // CHECK CURRENT GOOGLE USER
   // =====================================================
 
   useEffect(() => {
-    const currentUser = auth.currentUser;
-
-    if (!currentUser) {
-      navigate("/login", {
-        replace: true,
-      });
-
-      return;
-    }
-
-    setGoogleUser(currentUser);
-
-    const checkExistingProfile = async () => {
-      try {
-        const userRef = doc(db, "users", currentUser.uid);
-        const userSnapshot = await getDoc(userRef);
-
-        if (userSnapshot.exists()) {
-          const profile = userSnapshot.data();
-
-          if (profile.role === "student") {
-            navigate("/student-dashboard", {
-              replace: true,
-            });
-
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (firebaseUser) => {
+        try {
+          if (!firebaseUser) {
+            navigate("/login", { replace: true });
             return;
           }
 
-          if (profile.role === "client") {
-            navigate("/client-dashboard", {
-              replace: true,
-            });
+          setGoogleUser(firebaseUser);
 
-            return;
+          console.log(
+            "Google Role Selection User:",
+            firebaseUser.uid
+          );
+
+          // ------------------------------------------------
+          // CHECK WHETHER PROFILE ALREADY EXISTS
+          // ------------------------------------------------
+
+          const userRef = doc(
+            db,
+            "users",
+            firebaseUser.uid
+          );
+
+          const userSnapshot = await getDoc(userRef);
+
+          if (userSnapshot.exists()) {
+            const userProfile = userSnapshot.data();
+
+            console.log(
+              "Existing Profile Found:",
+              userProfile
+            );
+
+            if (userProfile.role === "student") {
+              navigate("/student-dashboard", {
+                replace: true,
+              });
+
+              return;
+            }
+
+            if (userProfile.role === "client") {
+              navigate("/client-dashboard", {
+                replace: true,
+              });
+
+              return;
+            }
           }
+        } catch (err) {
+          console.error(
+            "Google Role Selection Error:",
+            err
+          );
+
+          setError(
+            "Unable to load your Google account details."
+          );
+        } finally {
+          setIsLoading(false);
         }
-      } catch (err) {
-        console.error(
-          "Profile check error:",
-          err
-        );
-
-        setError(
-          "Unable to check your account. Please try again."
-        );
       }
-    };
+    );
 
-    checkExistingProfile();
+    return () => unsubscribe();
   }, [navigate]);
 
   // =====================================================
-  // CREATE FIRESTORE PROFILE
+  // SELECT ROLE
+  // =====================================================
+
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    setError("");
+  };
+
+  // =====================================================
+  // CONTINUE
   // =====================================================
 
   const handleContinue = async () => {
     setError("");
 
     if (!selectedRole) {
-      setError("Please select Student or Client.");
+      setError(
+        "Please select Student or Client to continue."
+      );
+
       return;
     }
 
     if (!googleUser) {
       setError(
-        "Google account session not found. Please login again."
+        "Google account information is not available."
       );
 
       return;
     }
 
     try {
-      setIsCreatingProfile(true);
+      setIsSaving(true);
+
+      console.log(
+        "Creating Google profile..."
+      );
+
+      console.log(
+        "Selected Role:",
+        selectedRole
+      );
+
+      // ------------------------------------------------
+      // FIRESTORE USER DOCUMENT
+      // ------------------------------------------------
 
       const userRef = doc(
         db,
@@ -97,360 +149,478 @@ function GoogleRoleSelection() {
         googleUser.uid
       );
 
-      const existingSnapshot = await getDoc(userRef);
+      const userData = {
+        uid: googleUser.uid,
 
-      // -------------------------------------------------
-      // STUDENT PROFILE
-      // -------------------------------------------------
+        role: selectedRole,
+
+        Name:
+          googleUser.displayName ||
+          "Google User",
+
+        Email:
+          googleUser.email || "",
+
+        Phone: "",
+
+        createdAt: serverTimestamp(),
+
+        authProvider: "google",
+      };
+
+      // ------------------------------------------------
+      // SAVE PROFILE
+      // ------------------------------------------------
+
+      await setDoc(
+        userRef,
+        userData,
+        {
+          merge: true,
+        }
+      );
+
+      console.log(
+        "Google profile created successfully."
+      );
+
+      // ------------------------------------------------
+      // REDIRECT BASED ON ROLE
+      // ------------------------------------------------
 
       if (selectedRole === "student") {
-        const studentProfile = {
-          Student_ID: googleUser.uid,
-
-          Name:
-            googleUser.displayName ||
-            "Student",
-
-          Email:
-            googleUser.email ||
-            "",
-
-          Phone: "",
-
-          College_Name: "",
-
-          Department: "",
-
-          Skills: [],
-
-          Resume: "",
-
-          Resume_URL: "",
-
-          role: "student",
-
-          Auth_Provider: "google",
-
-          Profile_Completed: false,
-
-          Created_At: new Date(),
-        };
-
-        if (!existingSnapshot.exists()) {
-          await setDoc(
-            userRef,
-            studentProfile
-          );
-        } else {
-          await setDoc(
-            userRef,
-            {
-              ...studentProfile,
-            },
-            {
-              merge: true,
-            }
-          );
-        }
-
-        console.log(
-          "Google Student profile created successfully"
+        navigate(
+          "/student-dashboard",
+          {
+            replace: true,
+          }
         );
-
-        navigate("/student-dashboard", {
-          replace: true,
-        });
 
         return;
       }
 
-      // -------------------------------------------------
-      // CLIENT PROFILE
-      // -------------------------------------------------
-
       if (selectedRole === "client") {
-        const clientProfile = {
-          Client_ID: googleUser.uid,
-
-          Company_Name:
-            googleUser.displayName ||
-            "Company",
-
-          Contact_Person:
-            googleUser.displayName ||
-            "",
-
-          Email:
-            googleUser.email ||
-            "",
-
-          Phone: "",
-
-          Company_Address: "",
-
-          role: "client",
-
-          Auth_Provider: "google",
-
-          Profile_Completed: false,
-
-          Created_At: new Date(),
-        };
-
-        if (!existingSnapshot.exists()) {
-          await setDoc(
-            userRef,
-            clientProfile
-          );
-        } else {
-          await setDoc(
-            userRef,
-            {
-              ...clientProfile,
-            },
-            {
-              merge: true,
-            }
-          );
-        }
-
-        console.log(
-          "Google Client profile created successfully"
+        navigate(
+          "/client-dashboard",
+          {
+            replace: true,
+          }
         );
-
-        navigate("/client-dashboard", {
-          replace: true,
-        });
 
         return;
       }
     } catch (err) {
       console.error(
-        "Google profile creation error:",
+        "Google Profile Creation Error:",
         err
       );
 
-      setError(
-        err.message ||
-          "Unable to create your profile. Please try again."
-      );
+      switch (err.code) {
+        case "permission-denied":
+          setError(
+            "Permission denied. Please check your Firebase Firestore rules."
+          );
+          break;
+
+        case "unavailable":
+          setError(
+            "Firestore is temporarily unavailable. Please try again."
+          );
+          break;
+
+        case "network-request-failed":
+          setError(
+            "Network error. Please check your internet connection."
+          );
+          break;
+
+        default:
+          setError(
+            err.message ||
+              "Unable to create your profile. Please try again."
+          );
+      }
     } finally {
-      setIsCreatingProfile(false);
+      setIsSaving(false);
     }
   };
 
   // =====================================================
-  // UI
+  // LOADING
   // =====================================================
 
-  if (!googleUser) {
+  if (isLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">
-          Checking your account...
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="text-center">
+
+          <div
+            className="
+              w-10
+              h-10
+              border-4
+              border-blue-200
+              border-t-blue-600
+              rounded-full
+              animate-spin
+              mx-auto
+              mb-4
+            "
+          />
+
+          <p className="text-gray-600">
+            Loading your Google account...
+          </p>
+
         </div>
       </main>
     );
   }
 
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center px-6 py-16">
-      <div className="w-full max-w-2xl">
 
-        {/* Header */}
+      <div className="w-full max-w-lg">
+
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
         <div className="text-center mb-8">
+
           <p className="text-blue-600 font-semibold tracking-wide">
             SKILLBRIDGE AI
           </p>
 
-          <h1 className="text-4xl font-bold text-gray-900 mt-3">
-            Welcome to SkillBridge AI
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-3">
+            Complete Your Profile
           </h1>
 
           <p className="text-gray-600 mt-3">
-            Choose how you want to use SkillBridge AI.
+            Select how you want to use SkillBridge AI.
           </p>
+
         </div>
 
-        {/* Google Account */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 mb-6">
-          <div className="flex items-center gap-4">
+        {/* =================================================
+            MAIN CARD
+        ================================================= */}
 
-            {googleUser.photoURL ? (
-              <img
-                src={googleUser.photoURL}
-                alt="Google profile"
-                className="w-14 h-14 rounded-full"
-              />
-            ) : (
-              <div
-                className="w-14 h-14 rounded-full
-                bg-blue-100
-                text-blue-600
-                flex items-center justify-center
-                text-xl
-                font-bold"
-              >
-                {(googleUser.displayName ||
-                  googleUser.email ||
-                  "G")
-                  .charAt(0)
-                  .toUpperCase()}
-              </div>
-            )}
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8">
 
-            <div>
-              <p className="font-semibold text-gray-900">
-                {googleUser.displayName ||
-                  "Google User"}
-              </p>
+          {/* =================================================
+              GOOGLE ACCOUNT
+          ================================================= */}
 
-              <p className="text-sm text-gray-500">
-                {googleUser.email}
-              </p>
-            </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+
+            <p className="text-sm text-gray-500 mb-1">
+              Google Account
+            </p>
+
+            <p className="font-semibold text-gray-900 break-words">
+              {googleUser?.displayName ||
+                "Google User"}
+            </p>
+
+            <p className="text-sm text-gray-600 break-words">
+              {googleUser?.email || ""}
+            </p>
 
           </div>
-        </div>
 
-        {/* Role Selection */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
+          {/* =================================================
+              ROLE TITLE
+          ================================================= */}
 
-          <h2 className="text-xl font-semibold text-gray-900 text-center">
-            Select Your Role
-          </h2>
+          <div className="mb-4">
 
-          <p className="text-gray-500 text-center mt-2">
-            Choose the role that best describes how you will use the platform.
-          </p>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Choose Your Role
+            </h2>
 
-          <div className="grid md:grid-cols-2 gap-5 mt-8">
+            <p className="text-sm text-gray-600 mt-1">
+              Select the role you want to use on
+              SkillBridge AI.
+            </p>
 
-            {/* Student */}
+          </div>
+
+          {/* =================================================
+              ROLE OPTIONS
+          ================================================= */}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            {/* =================================================
+                STUDENT
+            ================================================= */}
+
             <button
               type="button"
               onClick={() =>
-                setSelectedRole("student")
+                handleRoleSelect("student")
               }
-              className={`text-left p-6 rounded-xl border-2
-              transition-all duration-300
-              ${
-                selectedRole === "student"
-                  ? "border-blue-600 bg-blue-50 shadow-md"
-                  : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-md"
-              }`}
-            >
-              <div className="text-3xl mb-4">
-                🎓
-              </div>
+              className={`
+                text-left
+                p-5
+                rounded-xl
+                border-2
+                transition-all
+                duration-200
 
-              <h3 className="text-xl font-semibold text-gray-900">
-                Student
-              </h3>
-
-              <p className="text-gray-600 text-sm mt-2">
-                Find freelance projects, showcase your skills,
-                upload your resume and apply for opportunities.
-              </p>
-
-              <div
-                className={`mt-5 text-sm font-semibold ${
+                ${
                   selectedRole === "student"
-                    ? "text-blue-600"
-                    : "text-gray-400"
-                }`}
-              >
-                {selectedRole === "student"
-                  ? "✓ Selected"
-                  : "Select Student"}
+                    ? `
+                      border-blue-600
+                      bg-blue-50
+                      shadow-sm
+                    `
+                    : `
+                      border-gray-200
+                      bg-white
+                      hover:border-blue-300
+                      hover:bg-gray-50
+                    `
+                }
+              `}
+            >
+
+              <div className="flex items-start gap-4">
+
+                <div
+                  className={`
+                    w-11
+                    h-11
+                    rounded-lg
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                    ${
+                      selectedRole ===
+                      "student"
+                        ? "bg-blue-600 text-white"
+                        : "bg-blue-50 text-blue-600"
+                    }
+                  `}
+                >
+                  🎓
+                </div>
+
+                <div>
+
+                  <h3 className="font-semibold text-gray-900">
+                    Student
+                  </h3>
+
+                  <p className="text-sm text-gray-600 mt-1">
+                    Find projects, apply for freelance
+                    work and build your profile.
+                  </p>
+
+                </div>
+
               </div>
+
+              {selectedRole ===
+                "student" && (
+                <div className="mt-4 text-sm font-semibold text-blue-600">
+                  ✓ Student selected
+                </div>
+              )}
+
             </button>
 
-            {/* Client */}
+            {/* =================================================
+                CLIENT
+            ================================================= */}
+
             <button
               type="button"
               onClick={() =>
-                setSelectedRole("client")
+                handleRoleSelect("client")
               }
-              className={`text-left p-6 rounded-xl border-2
-              transition-all duration-300
-              ${
-                selectedRole === "client"
-                  ? "border-blue-600 bg-blue-50 shadow-md"
-                  : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-md"
-              }`}
-            >
-              <div className="text-3xl mb-4">
-                💼
-              </div>
+              className={`
+                text-left
+                p-5
+                rounded-xl
+                border-2
+                transition-all
+                duration-200
 
-              <h3 className="text-xl font-semibold text-gray-900">
-                Client
-              </h3>
-
-              <p className="text-gray-600 text-sm mt-2">
-                Post freelance projects, review student applications
-                and find students with the right skills.
-              </p>
-
-              <div
-                className={`mt-5 text-sm font-semibold ${
+                ${
                   selectedRole === "client"
-                    ? "text-blue-600"
-                    : "text-gray-400"
-                }`}
-              >
-                {selectedRole === "client"
-                  ? "✓ Selected"
-                  : "Select Client"}
+                    ? `
+                      border-blue-600
+                      bg-blue-50
+                      shadow-sm
+                    `
+                    : `
+                      border-gray-200
+                      bg-white
+                      hover:border-blue-300
+                      hover:bg-gray-50
+                    `
+                }
+              `}
+            >
+
+              <div className="flex items-start gap-4">
+
+                <div
+                  className={`
+                    w-11
+                    h-11
+                    rounded-lg
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                    ${
+                      selectedRole ===
+                      "client"
+                        ? "bg-blue-600 text-white"
+                        : "bg-blue-50 text-blue-600"
+                    }
+                  `}
+                >
+                  💼
+                </div>
+
+                <div>
+
+                  <h3 className="font-semibold text-gray-900">
+                    Client
+                  </h3>
+
+                  <p className="text-sm text-gray-600 mt-1">
+                    Post projects, review applications
+                    and hire students.
+                  </p>
+
+                </div>
+
               </div>
+
+              {selectedRole ===
+                "client" && (
+                <div className="mt-4 text-sm font-semibold text-blue-600">
+                  ✓ Client selected
+                </div>
+              )}
+
             </button>
 
           </div>
 
-          {/* Error */}
+          {/* =================================================
+              ERROR
+          ================================================= */}
+
           {error && (
             <div
-              className="mt-6 px-4 py-3 rounded-lg
-              bg-red-50
-              border border-red-200
-              text-red-600
-              text-sm"
+              className="
+                mt-5
+                px-4
+                py-3
+                rounded-lg
+                bg-red-50
+                border
+                border-red-200
+                text-red-600
+                text-sm
+              "
             >
               {error}
             </div>
           )}
 
-          {/* Continue */}
+          {/* =================================================
+              CONTINUE BUTTON
+          ================================================= */}
+
           <button
             type="button"
             onClick={handleContinue}
             disabled={
-              !selectedRole ||
-              isCreatingProfile
+              isSaving ||
+              !selectedRole
             }
-            className={`w-full mt-7 py-3 rounded-lg
-            font-semibold text-white
-            transition-all duration-300
-            ${
-              !selectedRole ||
-              isCreatingProfile
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 hover:-translate-y-1 hover:shadow-lg active:scale-95"
-            }`}
+            className={`
+              w-full
+              mt-6
+              py-3
+              rounded-lg
+              font-semibold
+              text-white
+              transition-all
+              duration-300
+
+              ${
+                isSaving ||
+                !selectedRole
+                  ? `
+                    bg-blue-300
+                    cursor-not-allowed
+                  `
+                  : `
+                    bg-blue-600
+                    hover:bg-blue-700
+                    hover:-translate-y-1
+                    hover:shadow-lg
+                    active:scale-95
+                  `
+              }
+            `}
           >
-            {isCreatingProfile
+            {isSaving
               ? "Creating Profile..."
               : "Continue"}
           </button>
 
-          <p className="text-center text-xs text-gray-400 mt-5">
-            This selection is required only for your first Google login.
-          </p>
+          {/* =================================================
+              BACK TO LOGIN
+          ================================================= */}
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate("/login")
+            }
+            disabled={isSaving}
+            className="
+              w-full
+              mt-4
+              py-3
+              rounded-lg
+              font-medium
+              text-gray-600
+              hover:text-blue-600
+              transition-colors
+              duration-200
+            "
+          >
+            ← Back to Login
+          </button>
 
         </div>
 
+        {/* =================================================
+            FOOTER NOTE
+        ================================================= */}
+
+        <p className="text-center text-xs text-gray-500 mt-6">
+          Your Google account will be securely connected
+          to your SkillBridge AI profile.
+        </p>
+
       </div>
+
     </main>
   );
 }
