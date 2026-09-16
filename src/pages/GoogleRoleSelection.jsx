@@ -1,7 +1,16 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useState,
+} from "react";
 
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  useNavigate,
+} from "react-router-dom";
+
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
+
 import {
   doc,
   getDoc,
@@ -9,88 +18,126 @@ import {
   setDoc,
 } from "firebase/firestore";
 
-import { auth, db } from "../firebase/firebase";
+import {
+  auth,
+  db,
+} from "../firebase/firebase";
+
+import {
+  useAuth,
+} from "../context/AuthContext";
 
 function GoogleRoleSelection() {
   const navigate = useNavigate();
 
-  const [googleUser, setGoogleUser] = useState(null);
-  const [selectedRole, setSelectedRole] = useState("");
-  const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    refreshProfile,
+  } = useAuth();
+
+  const [googleUser, setGoogleUser] =
+    useState(null);
+
+  const [selectedRole, setSelectedRole] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  const [isSaving, setIsSaving] =
+    useState(false);
+
+  const [isLoading, setIsLoading] =
+    useState(true);
 
   // =====================================================
   // CHECK CURRENT GOOGLE USER
   // =====================================================
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (firebaseUser) => {
-        try {
-          if (!firebaseUser) {
-            navigate("/login", { replace: true });
-            return;
-          }
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        async (firebaseUser) => {
+          try {
+            if (!firebaseUser) {
+              navigate("/login", {
+                replace: true,
+              });
 
-          setGoogleUser(firebaseUser);
+              return;
+            }
 
-          console.log(
-            "Google Role Selection User:",
-            firebaseUser.uid
-          );
-
-          // ------------------------------------------------
-          // CHECK WHETHER PROFILE ALREADY EXISTS
-          // ------------------------------------------------
-
-          const userRef = doc(
-            db,
-            "users",
-            firebaseUser.uid
-          );
-
-          const userSnapshot = await getDoc(userRef);
-
-          if (userSnapshot.exists()) {
-            const userProfile = userSnapshot.data();
+            setGoogleUser(firebaseUser);
 
             console.log(
-              "Existing Profile Found:",
-              userProfile
+              "Google Role Selection User:",
+              firebaseUser.uid
             );
 
-            if (userProfile.role === "student") {
-              navigate("/student-dashboard", {
-                replace: true,
-              });
+            // ------------------------------------------------
+            // CHECK EXISTING PROFILE
+            // ------------------------------------------------
 
-              return;
+            const userRef = doc(
+              db,
+              "users",
+              firebaseUser.uid
+            );
+
+            const userSnapshot =
+              await getDoc(userRef);
+
+            if (userSnapshot.exists()) {
+              const userProfile =
+                userSnapshot.data();
+
+              console.log(
+                "Existing Profile Found:",
+                userProfile
+              );
+
+              if (
+                userProfile.role ===
+                "student"
+              ) {
+                navigate(
+                  "/student-dashboard",
+                  {
+                    replace: true,
+                  }
+                );
+
+                return;
+              }
+
+              if (
+                userProfile.role ===
+                "client"
+              ) {
+                navigate(
+                  "/client-dashboard",
+                  {
+                    replace: true,
+                  }
+                );
+
+                return;
+              }
             }
+          } catch (err) {
+            console.error(
+              "Google Role Selection Error:",
+              err
+            );
 
-            if (userProfile.role === "client") {
-              navigate("/client-dashboard", {
-                replace: true,
-              });
-
-              return;
-            }
+            setError(
+              "Unable to load your Google account details."
+            );
+          } finally {
+            setIsLoading(false);
           }
-        } catch (err) {
-          console.error(
-            "Google Role Selection Error:",
-            err
-          );
-
-          setError(
-            "Unable to load your Google account details."
-          );
-        } finally {
-          setIsLoading(false);
         }
-      }
-    );
+      );
 
     return () => unsubscribe();
   }, [navigate]);
@@ -139,9 +186,9 @@ function GoogleRoleSelection() {
         selectedRole
       );
 
-      // ------------------------------------------------
+      // =================================================
       // FIRESTORE USER DOCUMENT
-      // ------------------------------------------------
+      // =================================================
 
       const userRef = doc(
         db,
@@ -163,14 +210,15 @@ function GoogleRoleSelection() {
 
         Phone: "",
 
-        createdAt: serverTimestamp(),
+        createdAt:
+          serverTimestamp(),
 
         authProvider: "google",
       };
 
-      // ------------------------------------------------
+      // =================================================
       // SAVE PROFILE
-      // ------------------------------------------------
+      // =================================================
 
       await setDoc(
         userRef,
@@ -184,11 +232,48 @@ function GoogleRoleSelection() {
         "Google profile created successfully."
       );
 
-      // ------------------------------------------------
-      // REDIRECT BASED ON ROLE
-      // ------------------------------------------------
+      // =================================================
+      // IMPORTANT:
+      // REFRESH AUTH CONTEXT PROFILE
+      // BEFORE NAVIGATION
+      // =================================================
 
-      if (selectedRole === "student") {
+      const updatedProfile =
+        await refreshProfile();
+
+      console.log(
+        "AuthContext Profile Refreshed:",
+        updatedProfile
+      );
+
+      // =================================================
+      // VERIFY PROFILE ROLE
+      // =================================================
+
+      if (
+        !updatedProfile ||
+        updatedProfile.role !==
+          selectedRole
+      ) {
+        setError(
+          "Profile was saved, but account information is still loading. Please try again."
+        );
+
+        return;
+      }
+
+      // =================================================
+      // REDIRECT BASED ON ROLE
+      // =================================================
+
+      if (
+        selectedRole ===
+        "student"
+      ) {
+        console.log(
+          "Redirecting to Student Dashboard..."
+        );
+
         navigate(
           "/student-dashboard",
           {
@@ -199,7 +284,14 @@ function GoogleRoleSelection() {
         return;
       }
 
-      if (selectedRole === "client") {
+      if (
+        selectedRole ===
+        "client"
+      ) {
+        console.log(
+          "Redirecting to Client Dashboard..."
+        );
+
         navigate(
           "/client-dashboard",
           {
@@ -286,9 +378,7 @@ function GoogleRoleSelection() {
 
       <div className="w-full max-w-lg">
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
+        {/* HEADER */}
 
         <div className="text-center mb-8">
 
@@ -306,15 +396,11 @@ function GoogleRoleSelection() {
 
         </div>
 
-        {/* =================================================
-            MAIN CARD
-        ================================================= */}
+        {/* MAIN CARD */}
 
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8">
 
-          {/* =================================================
-              GOOGLE ACCOUNT
-          ================================================= */}
+          {/* GOOGLE ACCOUNT */}
 
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
 
@@ -333,9 +419,7 @@ function GoogleRoleSelection() {
 
           </div>
 
-          {/* =================================================
-              ROLE TITLE
-          ================================================= */}
+          {/* ROLE TITLE */}
 
           <div className="mb-4">
 
@@ -350,20 +434,18 @@ function GoogleRoleSelection() {
 
           </div>
 
-          {/* =================================================
-              ROLE OPTIONS
-          ================================================= */}
+          {/* ROLE OPTIONS */}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-            {/* =================================================
-                STUDENT
-            ================================================= */}
+            {/* STUDENT */}
 
             <button
               type="button"
               onClick={() =>
-                handleRoleSelect("student")
+                handleRoleSelect(
+                  "student"
+                )
               }
               className={`
                 text-left
@@ -374,7 +456,8 @@ function GoogleRoleSelection() {
                 duration-200
 
                 ${
-                  selectedRole === "student"
+                  selectedRole ===
+                  "student"
                     ? `
                       border-blue-600
                       bg-blue-50
@@ -401,6 +484,7 @@ function GoogleRoleSelection() {
                     items-center
                     justify-center
                     text-xl
+
                     ${
                       selectedRole ===
                       "student"
@@ -436,14 +520,14 @@ function GoogleRoleSelection() {
 
             </button>
 
-            {/* =================================================
-                CLIENT
-            ================================================= */}
+            {/* CLIENT */}
 
             <button
               type="button"
               onClick={() =>
-                handleRoleSelect("client")
+                handleRoleSelect(
+                  "client"
+                )
               }
               className={`
                 text-left
@@ -454,7 +538,8 @@ function GoogleRoleSelection() {
                 duration-200
 
                 ${
-                  selectedRole === "client"
+                  selectedRole ===
+                  "client"
                     ? `
                       border-blue-600
                       bg-blue-50
@@ -481,6 +566,7 @@ function GoogleRoleSelection() {
                     items-center
                     justify-center
                     text-xl
+
                     ${
                       selectedRole ===
                       "client"
@@ -518,9 +604,7 @@ function GoogleRoleSelection() {
 
           </div>
 
-          {/* =================================================
-              ERROR
-          ================================================= */}
+          {/* ERROR */}
 
           {error && (
             <div
@@ -540,9 +624,7 @@ function GoogleRoleSelection() {
             </div>
           )}
 
-          {/* =================================================
-              CONTINUE BUTTON
-          ================================================= */}
+          {/* CONTINUE */}
 
           <button
             type="button"
@@ -583,9 +665,7 @@ function GoogleRoleSelection() {
               : "Continue"}
           </button>
 
-          {/* =================================================
-              BACK TO LOGIN
-          ================================================= */}
+          {/* BACK */}
 
           <button
             type="button"
@@ -610,9 +690,7 @@ function GoogleRoleSelection() {
 
         </div>
 
-        {/* =================================================
-            FOOTER NOTE
-        ================================================= */}
+        {/* FOOTER */}
 
         <p className="text-center text-xs text-gray-500 mt-6">
           Your Google account will be securely connected
