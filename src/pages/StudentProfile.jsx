@@ -50,37 +50,51 @@ function StudentProfile() {
   });
 
   // =====================================================
+  // NORMALIZE SKILLS
+  // =====================================================
+
+  const normalizeSkills = (skills) => {
+    if (Array.isArray(skills)) {
+      return skills
+        .map((skill) => String(skill).trim())
+        .filter((skill) => skill !== "");
+    }
+
+    if (typeof skills === "string") {
+      return skills
+        .split(",")
+        .map((skill) => skill.trim())
+        .filter((skill) => skill !== "");
+    }
+
+    return [];
+  };
+
+  // =====================================================
   // LOAD PROFILE
   // =====================================================
 
   useEffect(() => {
-    if (profile) {
-      setFormData({
-        Name: profile.Name || "",
-        Email: profile.Email || "",
-        Phone: profile.Phone || "",
-        Student_ID:
-          profile.Student_ID ||
-          profile.uid ||
-          "",
-        College_Name:
-          profile.College_Name || "",
-        Department:
-          profile.Department || "",
-        Skills: Array.isArray(profile.Skills)
-          ? profile.Skills
-          : profile.Skills
-            ? profile.Skills
-                .split(",")
-                .map((skill) => skill.trim())
-                .filter((skill) => skill !== "")
-            : [],
-        Resume: profile.Resume || "",
-        Resume_URL:
-          profile.Resume_URL || "",
-      });
+    if (!profile) {
+      return;
     }
-  }, [profile]);
+
+    setFormData({
+      Name: profile.Name || "",
+      Email: profile.Email || "",
+      Phone: profile.Phone || "",
+      Student_ID:
+        profile.Student_ID ||
+        profile.uid ||
+        user?.uid ||
+        "",
+      College_Name: profile.College_Name || "",
+      Department: profile.Department || "",
+      Skills: normalizeSkills(profile.Skills),
+      Resume: profile.Resume || "",
+      Resume_URL: profile.Resume_URL || "",
+    });
+  }, [profile, user]);
 
   // =====================================================
   // NORMAL INPUT CHANGE
@@ -95,6 +109,7 @@ function StudentProfile() {
     }));
 
     setErrorMessage("");
+    setSuccessMessage("");
   };
 
   // =====================================================
@@ -112,12 +127,11 @@ function StudentProfile() {
       const skillAlreadySelected =
         currentSkills.includes(skill);
 
-      const updatedSkills =
-        skillAlreadySelected
-          ? currentSkills.filter(
-              (item) => item !== skill
-            )
-          : [...currentSkills, skill];
+      const updatedSkills = skillAlreadySelected
+        ? currentSkills.filter(
+            (item) => item !== skill
+          )
+        : [...currentSkills, skill];
 
       return {
         ...currentData,
@@ -143,20 +157,42 @@ function StudentProfile() {
       return;
     }
 
+    if (!formData.Name.trim()) {
+      setErrorMessage(
+        "Please enter your name."
+      );
+      return;
+    }
+
+    if (!formData.Phone.trim()) {
+      setErrorMessage(
+        "Please enter your phone number."
+      );
+      return;
+    }
+
+    if (!formData.College_Name.trim()) {
+      setErrorMessage(
+        "Please enter your college name."
+      );
+      return;
+    }
+
+    if (!formData.Department.trim()) {
+      setErrorMessage(
+        "Please enter your department."
+      );
+      return;
+    }
+
     try {
       setIsSaving(true);
       setSuccessMessage("");
       setErrorMessage("");
 
-      const skillsArray = Array.isArray(
+      const skillsArray = normalizeSkills(
         formData.Skills
-      )
-        ? formData.Skills
-            .map((skill) => skill.trim())
-            .filter(
-              (skill) => skill !== ""
-            )
-        : [];
+      );
 
       const studentRef = doc(
         db,
@@ -186,8 +222,8 @@ function StudentProfile() {
       setIsEditing(false);
 
       /*
-        Reload after a short delay so AuthContext
-        loads the latest Firestore profile data.
+        Reload after a short delay so the latest
+        Firestore profile is loaded again.
       */
       setTimeout(() => {
         window.location.reload();
@@ -222,20 +258,52 @@ function StudentProfile() {
       setErrorMessage(
         "User is not logged in."
       );
+
+      event.target.value = "";
       return;
     }
 
     setSuccessMessage("");
     setErrorMessage("");
 
-    // Allowed resume formats
+    // ===================================================
+    // ALLOWED FILE TYPES
+    // ===================================================
+
     const allowedTypes = [
       "application/pdf",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
 
-    if (!allowedTypes.includes(file.type)) {
+    const allowedExtensions = [
+      ".pdf",
+      ".doc",
+      ".docx",
+    ];
+
+    const fileName =
+      file.name.toLowerCase();
+
+    const hasValidMimeType =
+      allowedTypes.includes(file.type);
+
+    const hasValidExtension =
+      allowedExtensions.some(
+        (extension) =>
+          fileName.endsWith(extension)
+      );
+
+    /*
+      Some browsers may return an empty or different
+      MIME type for DOC/DOCX files.
+
+      Therefore extension + MIME type are checked.
+    */
+    if (
+      !hasValidMimeType &&
+      !hasValidExtension
+    ) {
       setErrorMessage(
         "Please upload only PDF, DOC, or DOCX files."
       );
@@ -244,7 +312,10 @@ function StudentProfile() {
       return;
     }
 
-    // Maximum file size = 5 MB
+    // ===================================================
+    // MAXIMUM FILE SIZE = 5 MB
+    // ===================================================
+
     const maxFileSize =
       5 * 1024 * 1024;
 
@@ -261,16 +332,31 @@ function StudentProfile() {
       setIsUploadingResume(true);
 
       console.log(
+        "===================================="
+      );
+
+      console.log(
         "Starting resume upload..."
       );
+
       console.log(
         "Resume file:",
         file.name
       );
+
+      console.log(
+        "Resume type:",
+        file.type
+      );
+
       console.log(
         "Resume size:",
         file.size
       );
+
+      // =================================================
+      // CLOUDINARY CONFIGURATION
+      // =================================================
 
       const cloudName =
         import.meta.env
@@ -285,13 +371,30 @@ function StudentProfile() {
         !uploadPreset
       ) {
         throw new Error(
-          "Cloudinary configuration is missing. Please check the .env file."
+          "Cloudinary configuration is missing. Please check the environment variables."
         );
       }
 
-      // Cloudinary raw upload
+      console.log(
+        "Cloudinary Cloud Name:",
+        cloudName
+      );
+
+      console.log(
+        "Cloudinary Upload Preset:",
+        uploadPreset
+      );
+
+      // =================================================
+      // CLOUDINARY RAW UPLOAD URL
+      // =================================================
+
       const uploadUrl =
         `https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`;
+
+      // =================================================
+      // CREATE FORM DATA
+      // =================================================
 
       const uploadData =
         new FormData();
@@ -315,6 +418,10 @@ function StudentProfile() {
         "Uploading resume to Cloudinary..."
       );
 
+      // =================================================
+      // UPLOAD TO CLOUDINARY
+      // =================================================
+
       const response =
         await fetch(uploadUrl, {
           method: "POST",
@@ -329,6 +436,10 @@ function StudentProfile() {
         result
       );
 
+      // =================================================
+      // CHECK CLOUDINARY RESPONSE
+      // =================================================
+
       if (!response.ok) {
         console.error(
           "Cloudinary upload failed:",
@@ -336,15 +447,24 @@ function StudentProfile() {
         );
 
         throw new Error(
-          result.error?.message ||
+          result?.error?.message ||
             "Resume upload failed."
         );
       }
 
+      // =================================================
+      // GET SECURE URL
+      // =================================================
+
       const resumeUrl =
-        result.secure_url;
+        result?.secure_url;
 
       if (!resumeUrl) {
+        console.error(
+          "Cloudinary response did not contain secure_url:",
+          result
+        );
+
         throw new Error(
           "Cloudinary did not return a resume URL."
         );
@@ -359,8 +479,10 @@ function StudentProfile() {
         resumeUrl
       );
 
-      // Save resume information
-      // in Firestore
+      // =================================================
+      // SAVE RESUME INFORMATION TO FIRESTORE
+      // =================================================
+
       const studentRef = doc(
         db,
         "users",
@@ -376,7 +498,25 @@ function StudentProfile() {
         "Resume information saved to Firestore."
       );
 
-      // Update local state
+      console.log(
+        "Student UID:",
+        user.uid
+      );
+
+      console.log(
+        "Saved Resume:",
+        file.name
+      );
+
+      console.log(
+        "Saved Resume_URL:",
+        resumeUrl
+      );
+
+      // =================================================
+      // UPDATE LOCAL FORM STATE
+      // =================================================
+
       setFormData(
         (currentData) => ({
           ...currentData,
@@ -385,23 +525,41 @@ function StudentProfile() {
         })
       );
 
+      // =================================================
+      // SUCCESS MESSAGE
+      // =================================================
+
       setSuccessMessage(
         "Resume uploaded successfully."
       );
+
+      /*
+        Resume upload itself saves directly to Firestore,
+        so no separate Save Changes click is required.
+      */
     } catch (error) {
+      console.error(
+        "===================================="
+      );
+
       console.error(
         "Resume upload error:",
         error
       );
 
+      console.error(
+        "===================================="
+      );
+
       setErrorMessage(
-        error.message ||
+        error?.message ||
           "Unable to upload resume. Please try again."
       );
     } finally {
       setIsUploadingResume(false);
 
-      // Reset file input
+      // Reset file input so the same file
+      // can be selected again if needed.
       event.target.value = "";
     }
   };
@@ -413,17 +571,35 @@ function StudentProfile() {
   const handleViewResume = () => {
     if (!formData.Resume_URL) {
       setErrorMessage(
-        "No resume file is available."
+        "No resume file is available. Please upload your resume again."
       );
 
       return;
     }
 
-    window.open(
-      formData.Resume_URL,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    try {
+      const resumeWindow =
+        window.open(
+          formData.Resume_URL,
+          "_blank",
+          "noopener,noreferrer"
+        );
+
+      if (!resumeWindow) {
+        setErrorMessage(
+          "Unable to open the resume. Please allow pop-ups for this website."
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Resume view error:",
+        error
+      );
+
+      setErrorMessage(
+        "Unable to open the resume."
+      );
+    }
   };
 
   // =====================================================
@@ -439,27 +615,15 @@ function StudentProfile() {
         Student_ID:
           profile.Student_ID ||
           profile.uid ||
+          user?.uid ||
           "",
         College_Name:
           profile.College_Name || "",
         Department:
           profile.Department || "",
-        Skills: Array.isArray(
+        Skills: normalizeSkills(
           profile.Skills
-        )
-          ? profile.Skills
-          : profile.Skills
-            ? profile.Skills
-                .split(",")
-                .map(
-                  (skill) =>
-                    skill.trim()
-                )
-                .filter(
-                  (skill) =>
-                    skill !== ""
-                )
-            : [],
+        ),
         Resume:
           profile.Resume || "",
         Resume_URL:
@@ -552,7 +716,7 @@ function StudentProfile() {
                     Student
                   </p>
 
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 mt-1 break-all">
                     {formData.Email}
                   </p>
                 </div>
@@ -563,9 +727,7 @@ function StudentProfile() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSuccessMessage(
-                      ""
-                    );
+                    setSuccessMessage("");
                     setErrorMessage("");
                     setIsEditing(true);
                   }}
@@ -587,9 +749,7 @@ function StudentProfile() {
               ================================================= */
 
               <form
-                onSubmit={
-                  handleSaveProfile
-                }
+                onSubmit={handleSaveProfile}
               >
                 <div className="space-y-8">
 
@@ -729,10 +889,7 @@ function StudentProfile() {
                     </div>
                   </section>
 
-                  {/* =================================================
-                     SKILLS CHECKBOX
-                  ================================================= */}
-
+                  {/* Skills */}
                   <section>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Skills
@@ -745,48 +902,46 @@ function StudentProfile() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 border border-gray-200 rounded-xl p-5 bg-gray-50">
 
                       {availableSkills.map(
-                        (skill) => (
-                          <label
-                            key={skill}
-                            className={`flex items-center gap-3
-                            rounded-lg border
-                            px-4 py-3
-                            cursor-pointer
-                            transition-all duration-200
-                            ${
-                              formData.Skills.includes(
-                                skill
-                              )
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 bg-white hover:border-blue-300"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.Skills.includes(
-                                skill
-                              )}
-                              onChange={() =>
-                                handleSkillChange(
-                                  skill
-                                )
-                              }
-                              className="w-4 h-4 accent-blue-600 cursor-pointer"
-                            />
+                        (skill) => {
+                          const isSelected =
+                            formData.Skills.includes(
+                              skill
+                            );
 
-                            <span
-                              className={`text-sm font-medium ${
-                                formData.Skills.includes(
-                                  skill
-                                )
-                                  ? "text-blue-700"
-                                  : "text-gray-700"
+                          return (
+                            <label
+                              key={skill}
+                              className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-all duration-200 ${
+                                isSelected
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-gray-200 bg-white hover:border-blue-300"
                               }`}
                             >
-                              {skill}
-                            </span>
-                          </label>
-                        )
+                              <input
+                                type="checkbox"
+                                checked={
+                                  isSelected
+                                }
+                                onChange={() =>
+                                  handleSkillChange(
+                                    skill
+                                  )
+                                }
+                                className="w-4 h-4 accent-blue-600 cursor-pointer"
+                              />
+
+                              <span
+                                className={`text-sm font-medium ${
+                                  isSelected
+                                    ? "text-blue-700"
+                                    : "text-gray-700"
+                                }`}
+                              >
+                                {skill}
+                              </span>
+                            </label>
+                          );
+                        }
                       )}
 
                     </div>
@@ -875,14 +1030,12 @@ function StudentProfile() {
 
                         {isUploadingResume && (
                           <div className="mt-3 flex items-center gap-2 text-sm text-blue-600">
-
                             <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"></div>
 
                             <span>
                               Uploading
                               resume...
                             </span>
-
                           </div>
                         )}
                       </div>
@@ -1020,10 +1173,7 @@ function StudentProfile() {
                   </div>
                 </section>
 
-                {/* =================================================
-                   VIEW SKILLS
-                ================================================= */}
-
+                {/* Skills */}
                 <section>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
                     Skills
@@ -1091,10 +1241,20 @@ function StudentProfile() {
                         ) : (
                           <button
                             type="button"
-                            disabled
-                            className="px-5 py-2.5 rounded-lg bg-gray-200 text-gray-500 font-medium cursor-not-allowed"
+                            onClick={() => {
+                              setSuccessMessage(
+                                ""
+                              );
+                              setErrorMessage(
+                                "Resume file record exists, but the resume URL is missing. Please edit your profile and upload the resume again."
+                              );
+                              setIsEditing(
+                                true
+                              );
+                            }}
+                            className="px-5 py-2.5 rounded-lg bg-gray-200 text-gray-600 font-medium hover:bg-gray-300 transition"
                           >
-                            View Resume
+                            Upload Again
                           </button>
                         )}
 
@@ -1111,15 +1271,9 @@ function StudentProfile() {
                       <button
                         type="button"
                         onClick={() => {
-                          setSuccessMessage(
-                            ""
-                          );
-                          setErrorMessage(
-                            ""
-                          );
-                          setIsEditing(
-                            true
-                          );
+                          setSuccessMessage("");
+                          setErrorMessage("");
+                          setIsEditing(true);
                         }}
                         className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700"
                       >

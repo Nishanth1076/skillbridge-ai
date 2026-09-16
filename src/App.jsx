@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 
+import RegisterSelection from "./pages/RegisterSelection";
 import StudentRegister from "./pages/StudentRegister";
 import ClientRegister from "./pages/ClientRegister";
 
@@ -21,6 +22,7 @@ import ProjectDetails from "./pages/ProjectDetails";
 import PostProject from "./pages/PostProject";
 import ClientProjects from "./pages/ClientProjects";
 import ClientApplications from "./pages/ClientApplications";
+import EditProject from "./pages/EditProject";
 
 import MyApplications from "./pages/MyApplications";
 
@@ -31,24 +33,38 @@ import BackButton from "./pages/BackButton";
 function App() {
   const location = useLocation();
 
-  const showHomeNavbar = location.pathname === "/";
+  const showHomeNavbar =
+    location.pathname === "/";
 
   return (
     <>
       {showHomeNavbar && <Navbar />}
 
       <Routes>
-        {/* Home */}
-        <Route path="/" element={<Home />} />
 
-        {/* Authentication */}
-        <Route path="/login" element={<Login />} />
+        {/* HOME */}
+        <Route
+          path="/"
+          element={<Home />}
+        />
+
+        {/* AUTHENTICATION */}
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
         />
 
-        {/* Registration */}
+        {/* REGISTER */}
+        <Route
+          path="/register"
+          element={<RegisterSelection />}
+        />
+
         <Route
           path="/student-register"
           element={<StudentRegister />}
@@ -64,13 +80,13 @@ function App() {
           element={<ClientRegister />}
         />
 
-        {/* Google Login */}
+        {/* GOOGLE ROLE SELECTION */}
         <Route
           path="/google-role-selection"
           element={<GoogleRoleSelection />}
         />
 
-        {/* Student */}
+        {/* STUDENT MODULE */}
         <Route
           path="/student-dashboard"
           element={<StudentDashboard />}
@@ -86,7 +102,7 @@ function App() {
           element={<MyApplications />}
         />
 
-        {/* Client */}
+        {/* CLIENT MODULE */}
         <Route
           path="/client-dashboard"
           element={<ClientDashboard />}
@@ -112,7 +128,13 @@ function App() {
           element={<ClientApplications />}
         />
 
-        {/* Projects */}
+        {/* EDIT PROJECT */}
+        <Route
+          path="/edit-project/:projectId"
+          element={<EditProject />}
+        />
+
+        {/* PROJECT MODULE */}
         <Route
           path="/projects"
           element={<Projects />}
@@ -123,17 +145,18 @@ function App() {
           element={<ProjectDetails />}
         />
 
-        {/* Back Button */}
+        {/* BACK */}
         <Route
           path="/back"
           element={<BackButton />}
         />
 
-        {/* Fallback */}
+        {/* FALLBACK */}
         <Route
           path="*"
           element={<BackButton />}
         />
+
       </Routes>
     </>
   );

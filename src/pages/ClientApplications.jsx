@@ -27,6 +27,7 @@ function ClientApplications() {
   // =========================================
   // STUDENT PROFILE STATE
   // =========================================
+
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [isLoadingStudent, setIsLoadingStudent] = useState(false);
   const [studentError, setStudentError] = useState("");
@@ -34,31 +35,23 @@ function ClientApplications() {
   // =========================================
   // LOAD PROJECT AND APPLICATIONS
   // =========================================
+
   useEffect(() => {
     const loadApplications = async () => {
       if (loading) {
         return;
       }
 
-      // =========================================
-      // AUTH CHECK
-      // =========================================
       if (!user) {
         navigate("/login", { replace: true });
         return;
       }
 
-      // =========================================
-      // ROLE CHECK
-      // =========================================
       if (profile?.role !== "client") {
         navigate("/login", { replace: true });
         return;
       }
 
-      // =========================================
-      // PROJECT ID CHECK
-      // =========================================
       if (!projectId) {
         setError("Project ID is missing.");
         setIsLoading(false);
@@ -76,6 +69,7 @@ function ClientApplications() {
         // =========================================
         // GET PROJECT
         // =========================================
+
         const projectRef = doc(
           db,
           "projects",
@@ -87,8 +81,6 @@ function ClientApplications() {
         );
 
         if (!projectSnapshot.exists()) {
-          console.log("❌ Project not found.");
-
           setError(
             "The requested project could not be found."
           );
@@ -112,11 +104,8 @@ function ClientApplications() {
         // =========================================
         // CLIENT OWNERSHIP CHECK
         // =========================================
-        if (projectData.Client_ID !== user.uid) {
-          console.log(
-            "❌ This project does not belong to current client."
-          );
 
+        if (projectData.Client_ID !== user.uid) {
           setError(
             "You are not authorized to view applications for this project."
           );
@@ -132,6 +121,7 @@ function ClientApplications() {
         // =========================================
         // GET APPLICATIONS
         // =========================================
+
         const applicationsRef = collection(
           db,
           "projects",
@@ -158,6 +148,7 @@ function ClientApplications() {
         // =========================================
         // SORT APPLICATIONS
         // =========================================
+
         applicationList.sort((a, b) => {
           const dateA =
             a.appliedAt?.toDate
@@ -214,6 +205,7 @@ function ClientApplications() {
   // =========================================
   // VIEW STUDENT PROFILE
   // =========================================
+
   const handleViewStudent = async (studentId) => {
     if (!studentId) {
       setStudentError(
@@ -244,10 +236,6 @@ function ClientApplications() {
       );
 
       if (!studentSnapshot.exists()) {
-        console.log(
-          "❌ Student profile not found."
-        );
-
         setStudentError(
           "Student profile could not be found."
         );
@@ -265,21 +253,21 @@ function ClientApplications() {
         studentData
       );
 
+      console.log(
+        "📄 Resume:",
+        studentData.Resume
+      );
+
+      console.log(
+        "🔗 Resume URL:",
+        studentData.Resume_URL
+      );
+
       setSelectedStudent(studentData);
     } catch (error) {
       console.error(
         "❌ Error loading student profile:",
         error
-      );
-
-      console.error(
-        "❌ Error code:",
-        error.code
-      );
-
-      console.error(
-        "❌ Error message:",
-        error.message
       );
 
       setStudentError(
@@ -293,21 +281,108 @@ function ClientApplications() {
   // =========================================
   // VIEW STUDENT RESUME
   // =========================================
+
   const handleViewResume = () => {
-    if (!selectedStudent?.Resume_URL) {
+    const resumeUrl =
+      selectedStudent?.Resume_URL;
+
+    const resumeName =
+      selectedStudent?.Resume || "";
+
+    if (!resumeUrl) {
+      setStudentError(
+        "Resume file is not available for this student."
+      );
+
       return;
     }
 
-    window.open(
-      selectedStudent.Resume_URL,
+    console.log(
+      "📄 Opening resume:",
+      resumeName
+    );
+
+    console.log(
+      "🔗 Resume URL:",
+      resumeUrl
+    );
+
+    const lowerFileName =
+      resumeName.toLowerCase();
+
+    const isPdf =
+      lowerFileName.endsWith(".pdf");
+
+    const isWordDocument =
+      lowerFileName.endsWith(".doc") ||
+      lowerFileName.endsWith(".docx");
+
+    // =========================================
+    // PDF
+    // =========================================
+
+    if (isPdf) {
+      const newWindow = window.open(
+        resumeUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+
+      if (!newWindow) {
+        setStudentError(
+          "Your browser blocked the resume window. Please allow pop-ups and try again."
+        );
+      }
+
+      return;
+    }
+
+    // =========================================
+    // DOC / DOCX
+    // =========================================
+
+    if (isWordDocument) {
+      const viewerUrl =
+        `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
+          resumeUrl
+        )}`;
+
+      const newWindow = window.open(
+        viewerUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+
+      if (!newWindow) {
+        setStudentError(
+          "Your browser blocked the resume viewer. Please allow pop-ups and try again."
+        );
+      }
+
+      return;
+    }
+
+    // =========================================
+    // UNKNOWN FILE TYPE
+    // =========================================
+
+    const newWindow = window.open(
+      resumeUrl,
       "_blank",
       "noopener,noreferrer"
     );
+
+    if (!newWindow) {
+      setStudentError(
+        "Your browser blocked the resume window. Please allow pop-ups and try again."
+      );
+    }
   };
 
   // =========================================
   // UPDATE APPLICATION STATUS
   // =========================================
+
   const handleApplicationStatus = async (
     applicationId,
     newStatus
@@ -368,16 +443,6 @@ function ClientApplications() {
         error
       );
 
-      console.error(
-        "❌ Error code:",
-        error.code
-      );
-
-      console.error(
-        "❌ Error message:",
-        error.message
-      );
-
       setError(
         `Unable to ${actionText} this application. Please try again.`
       );
@@ -387,6 +452,7 @@ function ClientApplications() {
   // =========================================
   // CLOSE STUDENT PROFILE
   // =========================================
+
   const handleCloseStudentProfile = () => {
     setSelectedStudent(null);
     setStudentError("");
@@ -395,6 +461,7 @@ function ClientApplications() {
   // =========================================
   // STATUS STYLE
   // =========================================
+
   const getStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
       case "accepted":
@@ -417,6 +484,7 @@ function ClientApplications() {
   // =========================================
   // AUTH LOADING
   // =========================================
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -434,6 +502,7 @@ function ClientApplications() {
   // =========================================
   // PAGE LOADING
   // =========================================
+
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -452,9 +521,7 @@ function ClientApplications() {
     <main className="min-h-screen bg-gray-50">
       <section className="mx-auto max-w-6xl px-6 pb-16 pt-12">
 
-        {/* =====================================
-            BACK BUTTON
-        ===================================== */}
+        {/* BACK */}
         <button
           type="button"
           onClick={() =>
@@ -465,9 +532,7 @@ function ClientApplications() {
           ← Back to My Projects
         </button>
 
-        {/* =====================================
-            ERROR
-        ===================================== */}
+        {/* ERROR */}
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
             <p className="font-semibold text-red-700">
@@ -490,9 +555,7 @@ function ClientApplications() {
           </div>
         )}
 
-        {/* =====================================
-            PROJECT HEADER
-        ===================================== */}
+        {/* PROJECT */}
         {!error && project && (
           <>
             <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -513,7 +576,6 @@ function ClientApplications() {
                   </p>
                 </div>
 
-                {/* PROJECT STATUS */}
                 <span
                   className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-semibold ${
                     project.Status === "Open"
@@ -527,7 +589,6 @@ function ClientApplications() {
                 </span>
               </div>
 
-              {/* APPLICATION COUNT */}
               <div className="mt-7 border-t border-gray-100 pt-6">
                 <p className="text-gray-600">
                   <span className="font-bold text-gray-900">
@@ -541,9 +602,7 @@ function ClientApplications() {
               </div>
             </div>
 
-            {/* =====================================
-                EMPTY APPLICATION STATE
-            ===================================== */}
+            {/* EMPTY */}
             {applications.length === 0 && (
               <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl">
@@ -561,9 +620,7 @@ function ClientApplications() {
               </div>
             )}
 
-            {/* =====================================
-                APPLICATION LIST
-            ===================================== */}
+            {/* APPLICATIONS */}
             {applications.length > 0 && (
               <div className="mt-6 space-y-5">
 
@@ -574,7 +631,7 @@ function ClientApplications() {
                       className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md"
                     >
 
-                      {/* APPLICATION HEADER */}
+                      {/* HEADER */}
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
 
                         <div>
@@ -593,7 +650,6 @@ function ClientApplications() {
                           </p>
                         </div>
 
-                        {/* STATUS */}
                         <span
                           className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-semibold ${getStatusStyle(
                             application.status
@@ -604,10 +660,9 @@ function ClientApplications() {
                         </span>
                       </div>
 
-                      {/* APPLICATION DETAILS */}
+                      {/* DETAILS */}
                       <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
 
-                        {/* PROJECT BUDGET */}
                         <div className="rounded-xl border border-gray-200 p-5">
                           <p className="text-sm text-gray-500">
                             Project Budget
@@ -628,7 +683,6 @@ function ClientApplications() {
                           </p>
                         </div>
 
-                        {/* APPLIED DATE */}
                         <div className="rounded-xl border border-gray-200 p-5">
                           <p className="text-sm text-gray-500">
                             Applied Date
@@ -661,12 +715,9 @@ function ClientApplications() {
                         </div>
                       </div>
 
-                      {/* =====================================
-                          ACTION AREA
-                      ===================================== */}
+                      {/* ACTIONS */}
                       <div className="mt-6 flex flex-col gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
 
-                        {/* VIEW STUDENT */}
                         <button
                           type="button"
                           onClick={() =>
@@ -684,7 +735,6 @@ function ClientApplications() {
                             : "View Student"}
                         </button>
 
-                        {/* ACCEPT */}
                         <button
                           type="button"
                           onClick={() =>
@@ -707,7 +757,6 @@ function ClientApplications() {
                             : "Accept"}
                         </button>
 
-                        {/* REJECT */}
                         <button
                           type="button"
                           onClick={() =>
@@ -742,12 +791,13 @@ function ClientApplications() {
       {/* =========================================
           STUDENT PROFILE MODAL
       ========================================= */}
+
       {(selectedStudent || studentError) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
 
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
 
-            {/* MODAL HEADER */}
+            {/* HEADER */}
             <div className="flex items-start justify-between border-b border-gray-200 p-6">
 
               <div>
@@ -781,7 +831,7 @@ function ClientApplications() {
                     Unable to load student
                   </p>
 
-                  <p className="mt-1 text-red-600">
+                  <p className="mt-1 break-words text-red-600">
                     {studentError}
                   </p>
 
@@ -793,7 +843,7 @@ function ClientApplications() {
             {selectedStudent && (
               <div className="space-y-5 p-6">
 
-                {/* BASIC INFORMATION */}
+                {/* BASIC */}
                 <div className="rounded-xl border border-gray-200 p-5">
 
                   <h3 className="text-lg font-bold text-gray-900">
@@ -846,6 +896,7 @@ function ClientApplications() {
                           "Not provided"}
                       </p>
                     </div>
+
                   </div>
                 </div>
 
@@ -879,6 +930,7 @@ function ClientApplications() {
                           "Not provided"}
                       </p>
                     </div>
+
                   </div>
                 </div>
 
@@ -911,6 +963,7 @@ function ClientApplications() {
                         No skills provided.
                       </p>
                     )}
+
                   </div>
                 </div>
 
@@ -919,7 +972,7 @@ function ClientApplications() {
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="text-lg font-bold text-gray-900">
                         Resume
                       </h3>
@@ -928,13 +981,20 @@ function ClientApplications() {
                         {selectedStudent.Resume ||
                           "No resume uploaded."}
                       </p>
+
+                      {selectedStudent.Resume_URL && (
+                        <p className="mt-2 break-all text-xs text-gray-400">
+                          Resume file is available.
+                        </p>
+                      )}
                     </div>
 
-                    {/* VIEW RESUME */}
                     {selectedStudent.Resume_URL ? (
                       <button
                         type="button"
-                        onClick={handleViewResume}
+                        onClick={
+                          handleViewResume
+                        }
                         className="shrink-0 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white transition hover:bg-blue-700"
                       >
                         View Resume
@@ -944,12 +1004,13 @@ function ClientApplications() {
                         Resume Not Available
                       </span>
                     )}
+
                   </div>
                 </div>
               </div>
             )}
 
-            {/* MODAL FOOTER */}
+            {/* FOOTER */}
             <div className="border-t border-gray-200 p-6 text-right">
 
               <button
